@@ -14,14 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct Manuscript.tex
+      - name: Reconstruct and verify Manuscript.tex
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64, zlib
+          import base64, hashlib, zlib
           parts = sorted(Path('manuscript').glob('Manuscript.tex.zlib.b64.part*'))
+          if len(parts) != 5:
+              raise RuntimeError(f'Expected 5 payload parts, found {len(parts)}')
           src = ''.join(p.read_text().strip() for p in parts)
           data = zlib.decompress(base64.b64decode(src))
+          digest = hashlib.sha256(data).hexdigest()
+          expected = '412b49def75eac8b0ce3e6e906508a04c3d9cbc03e11260ee2c833a93115b9ce'
+          if digest != expected:
+              raise RuntimeError(f'SHA256 mismatch: {digest}')
           Path('manuscript/Manuscript.tex').write_bytes(data)
           PY
       - name: Commit reconstructed manuscript
