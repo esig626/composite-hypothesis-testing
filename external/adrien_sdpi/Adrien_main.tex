@@ -1,0 +1,120 @@
+\documentclass[conference,letterpaper]{IEEEtran}
+\addtolength{\topmargin}{9mm}
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage{url}
+\usepackage{ifthen}
+\usepackage{cite}
+\usepackage[cmex10]{amsmath}
+
+% Additional packages which were not part of the initial template
+\usepackage{bbm}
+\usepackage{amssymb}
+\usepackage[shortlabels]{enumitem}
+\usepackage{xcolor}
+\usepackage{thmtools}
+\usepackage{graphicx}
+\usepackage[capitalise]{cleveref}
+
+\declaretheorem[thmbox=M]{theorem}
+\declaretheorem[thmbox=M]{proposition}
+\declaretheorem[thmbox=M]{definition}
+\declaretheorem[thmbox=M]{lemma}
+\declaretheorem[thmbox=M]{corollary}
+\declaretheorem[thmbox=M]{example}
+\declaretheorem[style=remark]{remark}
+
+% My definitions
+\def \X{\mathsf X}
+\def \Y{\mathsf Y}
+\def \F{\mathcal F}
+\def \calP{\mathcal P}
+\def \calS{\mathcal S}
+\def \calH{\mathcal H}
+\def \reals {\mathbb R}
+\def \supp {\mathrm{supp}}
+\def \dualK{K^\star_\mu}
+\newcommand{\renyiDiv}[2]{D_{\alpha}\left(#1\|#2\right)}
+\newcommand{\dd}[1]{\mathrm{d}#1}
+\newcommand{\mean}[2]{\mathbb{E}_{#1}\left[#2\right]}
+\newcommand{\ip}[2]{\left\langle#1, #2\right\rangle}
+\newcommand{\hellingerInt}[2]{H_{\alpha}\left(#1\|#2\right)}
+% ------------------------------------------------------------
+\begin{document}
+\title{Contraction of R\'enyi Divergences for Discrete Channels: Properties and Applications} 
+
+\author{%
+  \IEEEauthorblockN{Adrien Vandenbroucque}
+  \IEEEauthorblockA{EPFL\\ 
+                    Lausanne, Switzerland\\
+                    adrien.vandenbroucque@epfl.ch}
+  \and
+  \IEEEauthorblockN{Amedeo Roberto Esposito}
+  \IEEEauthorblockA{Okinawa Institute of Science and Technology\\
+                    Onna, Japan\\
+                    amedeo.esposito@oist.jp}
+    \and
+    \IEEEauthorblockN{Michael Gastpar}
+    \IEEEauthorblockA{EPFL\\ 
+                    Lausanne, Switzerland\\
+                    michael.gastpar@epfl.ch}
+}
+
+\maketitle
+
+\begin{abstract}
+   This work explores properties of Strong Data-Processing constants for R\'enyi Divergences. Parallels are made with the well-studied $\varphi$-Divergences, and it is shown that the order $\alpha$ of R\'enyi Divergences dictates whether certain properties of the contraction of $\varphi$-Divergences are mirrored or not. In particular, we demonstrate that when $\alpha>1$, the contraction properties can deviate quite strikingly from those of $\varphi$-Divergences. We also uncover specific characteristics of contraction for the \mbox{$\infty$-R\'enyi Divergence} and relate it to \mbox{$\varepsilon$-Local Differential Privacy}. The results are then applied to bound the speed of convergence of Markov chains, where we argue that the contraction of R\'enyi Divergences offers a new perspective on the contraction of \mbox{$L^\alpha$-norms} commonly studied in the literature.
+   \end{abstract}
+\begin{IEEEkeywords}
+    R\'enyi Divergences, $\varphi$-Divergences, Data-Processing Inequality, Strong Data-Processing Inequality, Markov Chains, Local Differential Privacy
+\end{IEEEkeywords}
+
+\section{Introduction}\noindent
+The data-processing inequality (DPI) is a fundamental result in information theory, formalising the fact that post-processing cannot increase ``information''. In the last decade, efforts have been made to better understand a tightening of DPI known as the Strong Data-Processing Inequality (SDPI), whose purpose is to quantify the information contraction guaranteed by the DPI~\cite[Chapter 33]{Polyanskiy2025}. A growing body of work addresses both the computation of SDPI constants, their properties, and the inequalities governing their relationships. Part of the attractiveness comes from the applicability of such inequalities; they find practical use in information-theoretic settings such as local differential privacy~\cite{balle2019privacy,asoodeh2020contraction}, information percolation, broadcasting on trees, and information reconstruction~\cite{polyanskiy2017strong,polyanskiy2020application,gu2023non}, but also in the study of Markov processes or concentration inequalities, and their recent applications in machine learning~\cite{esposito2024concentration,koloskova2025certified,chien2024langevin}.
+
+SDPIs for $\varphi$-Divergences have been thoroughly studied, and it is now established that a variety of contraction properties are common to all of them~\cite{raginsky2016strong}. In this work, we restrict our attention to the contraction of R\'enyi Divergences of order $\alpha\geq 0$, a setting for which results are currently sparse~\cite{jin2024properties,abawonse2025generalized,grosse2025bounds}. We show that depending on the order of the R\'enyi Divergences, certain contraction properties characteristic of \mbox{$\varphi$-Divergences} may or may not be recovered. Differences can manifest in drastic ways; for instance, channels may be viewed as contractive under \mbox{$\varphi$-Divergences} but non-contractive under R\'enyi Divergences. After briefly connecting the contraction of the $\infty$-R\'enyi Divergence to Local Differential Privacy (LDP), we apply R\'enyi's SDPIs to bound how fast Markov chains converge to their stationary distribution. In that context, a fresh perspective on bounds provided by R\'enyi Divergences is highlighted, namely that they can be seen as non-linear contractions of $L^\alpha$-norms.
+
+The remainder of the paper is organised as follows. \Cref{section:background_and_definitions} presents the necessary background, including notation and definitions of divergences and SDPIs. We then proceed by establishing various bounds and identities pertaining to SDPIs for R\'enyi Divergences in~\cref{section:main_results}. Finally, a connection to $\varepsilon$-LDP is  made in~\Cref{section:applications}, followed by applying our result in the study of convergence of Markov chains.
+
+\section{Background and Definitions}\label{section:background_and_definitions}\noindent
+In the following, we consider spaces with finite alphabets. For such a space $\X$, it is assumed that a $\sigma$-algebra $\Sigma_\X$ is associated to it, rendering it a measure space. Since the considered spaces are finite, we can assume $\Sigma_\X$ to be the power set of $\X$. Indeed, in case it is not, some symbols in $\X$ can be merged to yield a new measure space with this property. We denote by $\calP(\X)$ the set of probability measures on $\X$ and by $\F(\X)$ the set of all real-valued functions on $\X$. The expectation of a function $f\in\F(\X)$ w.r.t. a probability measure $\mu\in\calP(\X)$ is ${\mean{\mu}{f}\triangleq\sum_{x\in\X}f(x)\mu(x)}$ and its $L^\alpha$-norm is ${\|f\|_{L^\alpha(\mu)}\triangleq\big(\mean{\mu}{|f|^\alpha}\big)^{\frac1\alpha}}$ for $\alpha\geq1$. Given two probability measures $\nu, \mu$, we write $\nu\ll\mu$ to denote that $\nu$ is absolutely continuous w.r.t. $\mu$, in which case there exists a Radon-Nikodym derivative $\frac{\dd\nu}{\dd\mu}$. The natural logarithm function is denoted by $\log$. The Binary Symmetric Channel with crossover probability $\varepsilon$ is written as $\mathrm{BSC}(\varepsilon)$.
+
+\subsection{Markov Kernels}\label{sec:markov_kernels}\noindent
+Hereafter, a channel will be viewed as a Markov kernel, or stochastic transformation.
+\begin{definition}
+    A Markov kernel $K:\Y\times\X\to[0, 1]$ specifies transition probabilities from elements of a set $\X$ to elements of a set $\Y$, and in particular
+\begin{enumerate}
+    \item $\forall x\in\X$, the mapping $y\mapsto K(y|x)$ is a probability distribution,
+    \item $\forall y\in\Y$, the mapping $x\mapsto K(y|x)$ is a $\Sigma_\X$-measurable real-valued function.
+\end{enumerate}
+\end{definition}
+
+A Markov kernel acts on probability distributions $\mu\in\calP(\X)$ as
+\begin{equation*}
+    \mu K (y) = \sum_{x\in\X} K(y|x)\mu(x), \quad \text{for }y\in\Y,
+\end{equation*}
+so that $\mu K\in\calP(\Y)$.
+The set of all such kernels is denoted by $\calP(\Y|\X)$. 
+
+\subsection{Divergences and (Strong) Data-Processing Inequalities}\noindent
+Let us define two families of divergences which will be central to this work, starting with R\'enyi Divergences~\cite{van2014renyi}.
+\begin{definition}
+    For two probability measures $\nu, \mu \in\calP(\X)$ such that $\nu \ll \mu$, the R\'enyi divergence of order $\alpha \geq 0$ from $\nu$ to $\mu$ is defined as 
+    \begin{equation*}
+        \renyiDiv{\nu}{\mu} = \frac{1}{\alpha - 1}\log\mean{\mu}{\left(\frac{\dd\nu}{\dd\mu}\right)^{\alpha}},
+    \end{equation*}
+    where the orders $0, 1$ and $\infty$ are defined by continuous extensions.
+\end{definition}
+The KL Divergence, denoted as $D_{\rm KL}(\nu\|\mu)$, corresponds to the limit $\alpha\to1$.
+
+The second family of divergences we consider are the $\varphi$-Divergences~\cite{csiszar1967information}.
+\begin{definition}
+    Let $\varphi:\reals_+\to\reals$ be a convex function with $\varphi(1)=0$. For two probability measures $\nu, \mu\in\calP(\X)$ such that $\nu\ll\mu$, the $\varphi$-Divergence from $\nu$ to $\mu$ is defined as
+    \begin{equation*}
+        D_\varphi(\nu\|\mu) = \mean{\mu}{\varphi\left(\frac{\dd\nu}{\dd\mu}\right)}.
+    \end{equation*}
+\end{definition}
+
+% NOTE: Remaining source content is preserved in the uploaded source and should be treated as canonical for analysis. This repository copy was added for cloud analysis of Theorem 1 and Appendix C.
+\end{document}
