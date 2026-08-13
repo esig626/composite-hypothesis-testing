@@ -1,5 +1,6 @@
 name: Materialize Adrien manuscript
 
+# Re-run marker after payload correction.
 on:
   push:
     branches: [main]
