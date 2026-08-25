@@ -29,6 +29,7 @@ import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
@@ -41,6 +42,7 @@ os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "cht-mpl
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
 from numpy.typing import NDArray
 from scipy.optimize import differential_evolution, minimize
 from scipy.special import gammaln, logsumexp
@@ -72,6 +74,7 @@ Q1 = np.array([0.37047326, 0.45476373, 0.17476301])
 
 REGIMES = ("constant", "linear")
 CONSTANT_EPSILON = 0.01
+DEFAULT_PARAMETER_GRID_SIZE = 65
 
 # A small-order mesh is essential in the fixed and subexponential Type-I
 # regimes.  The list is deliberately explicit so a run is reproducible.
@@ -364,6 +367,34 @@ def _configuration_fingerprint() -> str:
         "achievability_lambdas": ACHIEVABILITY_LAMBDAS.tolist(),
         "converse_a": CONVERSE_A.tolist(),
         "version": 3,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def _source_fingerprint() -> str:
+    """Hash both numerical implementations used by a per-n checkpoint."""
+
+    digest = hashlib.sha256()
+    for path in (Path(__file__), Path(__file__).with_name("affine_ternary_lp.py")):
+        digest.update(path.name.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _checkpoint_fingerprint(parameter_grid_size: int) -> str:
+    """Fingerprint every setting that can alter a blocklength result."""
+
+    payload = {
+        "renyi_configuration": _configuration_fingerprint(),
+        "source": _source_fingerprint(),
+        "regimes": list(REGIMES),
+        "constant_epsilon": CONSTANT_EPSILON,
+        "parameter_grid_size": int(parameter_grid_size),
+        "numpy_version": np.__version__,
+        "scipy_version": scipy.__version__,
+        "python_version": platform.python_version(),
+        "schema_version": 1,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -867,6 +898,8 @@ def evaluate_one_n(
     return {
         "n": n,
         "fingerprint": _configuration_fingerprint(),
+        "checkpoint_fingerprint": _checkpoint_fingerprint(parameter_grid_size),
+        "parameter_grid_size": parameter_grid_size,
         "rows": rows,
         "runtime_seconds": runtime,
     }
@@ -882,7 +915,7 @@ def _worker(n: int, cache: dict[str, object], parameter_grid_size: int) -> dict[
     return result
 
 
-def load_checkpoint(n: int) -> dict[str, object] | None:
+def load_checkpoint(n: int, parameter_grid_size: int) -> dict[str, object] | None:
     path = checkpoint_path(n)
     if not path.exists():
         return None
@@ -891,6 +924,9 @@ def load_checkpoint(n: int) -> dict[str, object] | None:
     if (
         int(result.get("n", -1)) != n
         or result.get("fingerprint") != _configuration_fingerprint()
+        or result.get("checkpoint_fingerprint")
+        != _checkpoint_fingerprint(parameter_grid_size)
+        or int(result.get("parameter_grid_size", -1)) != parameter_grid_size
     ):
         return None
     return result
@@ -908,7 +944,7 @@ def run_blocklengths(
     results: dict[int, dict[str, object]] = {}
     pending = []
     for n in n_values:
-        saved = None if force else load_checkpoint(n)
+        saved = None if force else load_checkpoint(n, parameter_grid_size)
         if saved is None:
             pending.append(n)
         else:
@@ -1250,7 +1286,9 @@ def write_audit(
         return value
 
     total_checkpoint_seconds = sum(
-        float(load_checkpoint(n)["runtime_seconds"]) for n in n_values if load_checkpoint(n) is not None
+        float(load_checkpoint(n, parameter_grid_size)["runtime_seconds"])
+        for n in n_values
+        if load_checkpoint(n, parameter_grid_size) is not None
     )
     checkpoint_mtimes = [
         checkpoint_path(n).stat().st_mtime for n in n_values if checkpoint_path(n).exists()
@@ -1322,18 +1360,23 @@ endpoint reduction or by treating a projected pair as least favourable.
 The reported blocklength mesh is: {mesh_text}.  The CSV contains only
 computed blocklengths.  Plotting joins those computed points by straight
 line segments; no smoothed or fabricated numerical rows are introduced.
+Projected-test calibration starts from {parameter_grid_size} equally spaced
+values of each class parameter before continuous refinement.
 
 For each blocklength, ternary sequences are symmetrised into
 `(n+1)(n+2)/2` exact types.  The minimax problem is a semi-infinite LP in
 the type-wise randomisation probabilities.  Constraint generation starts
 from seventeen deterministic values of each class parameter, solves with HiGHS,
 then adds continuous worst-case null and alternative parameters until both
-violations are at most `2e-9`.  Each separating expectation is a polynomial
-of degree at most `n`; it is represented at `n+1` Chebyshev nodes, all visible
-derivative roots are polished, and every candidate is re-evaluated from the
-original multinomial probabilities.  LP rows and the objective are scaled
-by `1e4`, and the HiGHS small-matrix threshold is `1e-12`, to retain rare
-exact types at large `n`.
+violations are at most `2e-9`; active parameters are deduplicated at
+`2e-10`.  Each separating expectation is a polynomial of degree at most `n`;
+it is represented at `n+1` Chebyshev nodes, trimmed at `5e-13`, and its
+derivative is screened with oversampling factor 16 before root polishing.
+Every candidate is re-evaluated from the original multinomial
+probabilities.  LP rows and the objective are scaled by `1e4`; HiGHS primal
+and dual feasibility tolerances are `1e-10`, the IPM optimality tolerance is
+`1e-12`, and the small-matrix threshold is `1e-12`, to retain rare exact
+types at large `n`.
 Dual simplex is the default master solver, with a deterministic interior-point
 fallback; `n=299` uses the same two methods in the opposite order because its
 dual-simplex active set is reproducibly degenerate.
@@ -1346,6 +1389,11 @@ optimised, and a common boundary randomisation is adjusted until the
 composite Type-I envelope exhausts the requested budget.  The smallest
 maximal Type-II error over the order mesh is reported; the loose closed-form
 exponential bound is not used.
+Each joint projection uses a 13-by-13 scout grid followed by L-BFGS-B from
+the twelve best starts (`ftol=1e-15`, `gtol=2e-10`, at most 500 iterations).
+Continuous error envelopes use `xatol=2e-11`, `fatol=1e-13`, and at most 160
+iterations.  Boundary calibration uses 60 bisection steps followed by ratio
+minimisation with `xatol=2e-12`, `fatol=1e-13`, and at most 180 iterations.
 
 For each Bruno converse branch, the script caches both directed composite
 Renyi divergences on {len(CONVERSE_LAMBDAS)} finite orders greater than one,
@@ -1354,7 +1402,8 @@ order mesh is deterministic in `a=(lambda-1)/lambda`, with logarithmic
 resolution near zero and one.  The displayed converse is the maximum of the
 forward and reverse branches.  Restricting the order optimisation to this
 mesh preserves converse validity (it can only weaken the displayed lower
-bound).
+bound).  The order-infinity projections are additionally polished by Powell
+optimisation with `xtol=2e-11`, `ftol=1e-14`, and at most 1,000 iterations.
 
 ## Independent validation
 
@@ -1381,10 +1430,11 @@ the maximum projected Type-I exhaustion error is
 
 At `n=30, epsilon=0.01` and `n=40, epsilon=1/n`, the largest simple-pair
 value is sought by seeded differential evolution over
-`(s,t) in [0,1]^2`; the search is not restricted to endpoints.  The positive
-search gaps numerically exclude least-favourable simple-pair reduction at
-those checks to the reported optimisation tolerance.  The other
-representative rows check endpoint-pair and projected-pair gaps.  Together,
+`(s,t) in [0,1]^2`; the search is not restricted to endpoints.  It uses
+`tol=2e-9`, `atol=2e-11`, population multiplier 18, and at most 180
+generations.  The positive search gaps numerically exclude least-favourable
+simple-pair reduction at those checks to these optimisation tolerances.  The
+other representative rows check endpoint-pair and projected-pair gaps.  Together,
 the strict gaps numerically exclude endpoint reduction and verify that the
 tightened projected test is not identically the composite minimax solution.
 Individual validation rows are included below.
@@ -1399,11 +1449,15 @@ The Renyi projections/divergences are independent of `n` and stored in
 `numerics/data/nonordered_bruno_renyi_cache.json`.  Each completed
 blocklength has an atomic JSON checkpoint under
 `numerics/checkpoints/nonordered_bruno_regimes/`; reruns resume by default.
+Checkpoint identity covers the endpoints and Renyi meshes, epsilon schedules,
+operating-grid size, both numerical source files, and the Python, NumPy, and
+SciPy versions, so a changed run configuration is not silently reused.
 Blocklengths were evaluated with {jobs} worker process(es) and one BLAS
 thread per worker.
 
-Current driver wall time (including resumed-checkpoint loading):
-{wall_seconds:.3f} seconds.  Sum of recorded per-blocklength worker times:
+Blocklength-stage wall time for the current resumed run (checkpoint loading
+only; excluding plotting and independent validation): {wall_seconds:.3f}
+seconds.  Sum of recorded per-blocklength worker times:
 {total_checkpoint_seconds:.3f} seconds.  Elapsed span from the first to last
 completed blocklength checkpoint: {checkpoint_span:.3f} seconds.  The
 n-independent Renyi cache took {float(cache['runtime_seconds']):.3f} seconds.
@@ -1436,7 +1490,9 @@ def main() -> None:
     parser.add_argument("--mesh", action="store_true", help="use the documented fallback n mesh")
     parser.add_argument("--n-values", help="comma-separated deterministic blocklengths")
     parser.add_argument("--jobs", type=int, default=min(4, max(1, (os.cpu_count() or 2) - 1)))
-    parser.add_argument("--parameter-grid-size", type=int, default=65)
+    parser.add_argument(
+        "--parameter-grid-size", type=int, default=DEFAULT_PARAMETER_GRID_SIZE
+    )
     parser.add_argument("--force", action="store_true", help="ignore per-n checkpoints")
     parser.add_argument("--force-renyi", action="store_true", help="recompute n-independent cache")
     parser.add_argument(

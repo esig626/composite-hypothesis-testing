@@ -45,18 +45,23 @@ endpoint reduction or by treating a projected pair as least favourable.
 The reported blocklength mesh is: all integers 1--300.  The CSV contains only
 computed blocklengths.  Plotting joins those computed points by straight
 line segments; no smoothed or fabricated numerical rows are introduced.
+Projected-test calibration starts from 65 equally spaced
+values of each class parameter before continuous refinement.
 
 For each blocklength, ternary sequences are symmetrised into
 `(n+1)(n+2)/2` exact types.  The minimax problem is a semi-infinite LP in
 the type-wise randomisation probabilities.  Constraint generation starts
 from seventeen deterministic values of each class parameter, solves with HiGHS,
 then adds continuous worst-case null and alternative parameters until both
-violations are at most `2e-9`.  Each separating expectation is a polynomial
-of degree at most `n`; it is represented at `n+1` Chebyshev nodes, all visible
-derivative roots are polished, and every candidate is re-evaluated from the
-original multinomial probabilities.  LP rows and the objective are scaled
-by `1e4`, and the HiGHS small-matrix threshold is `1e-12`, to retain rare
-exact types at large `n`.
+violations are at most `2e-9`; active parameters are deduplicated at
+`2e-10`.  Each separating expectation is a polynomial of degree at most `n`;
+it is represented at `n+1` Chebyshev nodes, trimmed at `5e-13`, and its
+derivative is screened with oversampling factor 16 before root polishing.
+Every candidate is re-evaluated from the original multinomial
+probabilities.  LP rows and the objective are scaled by `1e4`; HiGHS primal
+and dual feasibility tolerances are `1e-10`, the IPM optimality tolerance is
+`1e-12`, and the small-matrix threshold is `1e-12`, to retain rare exact
+types at large `n`.
 Dual simplex is the default master solver, with a deterministic interior-point
 fallback; `n=299` uses the same two methods in the opposite order because its
 dual-simplex active set is reproducibly degenerate.
@@ -69,6 +74,11 @@ optimised, and a common boundary randomisation is adjusted until the
 composite Type-I envelope exhausts the requested budget.  The smallest
 maximal Type-II error over the order mesh is reported; the loose closed-form
 exponential bound is not used.
+Each joint projection uses a 13-by-13 scout grid followed by L-BFGS-B from
+the twelve best starts (`ftol=1e-15`, `gtol=2e-10`, at most 500 iterations).
+Continuous error envelopes use `xatol=2e-11`, `fatol=1e-13`, and at most 160
+iterations.  Boundary calibration uses 60 bisection steps followed by ratio
+minimisation with `xatol=2e-12`, `fatol=1e-13`, and at most 180 iterations.
 
 For each Bruno converse branch, the script caches both directed composite
 Renyi divergences on 167 finite orders greater than one,
@@ -77,7 +87,8 @@ order mesh is deterministic in `a=(lambda-1)/lambda`, with logarithmic
 resolution near zero and one.  The displayed converse is the maximum of the
 forward and reverse branches.  Restricting the order optimisation to this
 mesh preserves converse validity (it can only weaken the displayed lower
-bound).
+bound).  The order-infinity projections are additionally polished by Powell
+optimisation with `xtol=2e-11`, `ftol=1e-14`, and at most 1,000 iterations.
 
 ## Independent validation
 
@@ -104,10 +115,11 @@ the maximum projected Type-I exhaustion error is
 
 At `n=30, epsilon=0.01` and `n=40, epsilon=1/n`, the largest simple-pair
 value is sought by seeded differential evolution over
-`(s,t) in [0,1]^2`; the search is not restricted to endpoints.  The positive
-search gaps numerically exclude least-favourable simple-pair reduction at
-those checks to the reported optimisation tolerance.  The other
-representative rows check endpoint-pair and projected-pair gaps.  Together,
+`(s,t) in [0,1]^2`; the search is not restricted to endpoints.  It uses
+`tol=2e-9`, `atol=2e-11`, population multiplier 18, and at most 180
+generations.  The positive search gaps numerically exclude least-favourable
+simple-pair reduction at those checks to these optimisation tolerances.  The
+other representative rows check endpoint-pair and projected-pair gaps.  Together,
 the strict gaps numerically exclude endpoint reduction and verify that the
 tightened projected test is not identically the composite minimax solution.
 Individual validation rows are included below.
@@ -267,11 +279,15 @@ The Renyi projections/divergences are independent of `n` and stored in
 `numerics/data/nonordered_bruno_renyi_cache.json`.  Each completed
 blocklength has an atomic JSON checkpoint under
 `numerics/checkpoints/nonordered_bruno_regimes/`; reruns resume by default.
+Checkpoint identity covers the endpoints and Renyi meshes, epsilon schedules,
+operating-grid size, both numerical source files, and the Python, NumPy, and
+SciPy versions, so a changed run configuration is not silently reused.
 Blocklengths were evaluated with 4 worker process(es) and one BLAS
 thread per worker.
 
-Current driver wall time (including resumed-checkpoint loading):
-0.042 seconds.  Sum of recorded per-blocklength worker times:
+Blocklength-stage wall time for the current resumed run (checkpoint loading
+only; excluding plotting and independent validation): 0.042
+seconds.  Sum of recorded per-blocklength worker times:
 2949.928 seconds.  Elapsed span from the first to last
 completed blocklength checkpoint: 1105.717 seconds.  The
 n-independent Renyi cache took 27.269 seconds.
