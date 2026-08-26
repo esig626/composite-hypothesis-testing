@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Replot the non-ordered Bruno 2x2 figure from the saved CSV only.
 
-This script performs no minimax, projected-test, or Renyi optimisation. It reads
-``numerics/data/nonordered_bruno_regimes.csv`` and redraws the four saved curves.
-For the converse panels it additionally evaluates the elementary Fano-style
-converse from the already-audited composite KL separation.
+This script performs no optimisation or hypothesis-testing calculations. It reads
+``numerics/data/nonordered_bruno_regimes.csv`` and redraws the four saved curves,
+adding the Fano-style weak converse derived directly from the saved Type-I budget.
 """
 
 from __future__ import annotations
@@ -27,9 +26,6 @@ FIGURE_DIR = ROOT / "numerics" / "figures"
 BLUE = "#1f77b4"
 ORANGE = "#ff7f0e"
 GREEN = "#2ca02c"
-
-# Audited value produced by minimise_kl_over_classes("Q||P") for the fixed
-# affine ternary classes used by nonordered_bruno_regimes.py.
 COMPOSITE_KL_QP = 0.01739677970744148
 
 
@@ -43,7 +39,7 @@ plt.rcParams.update(
         "axes.titlesize": 12,
         "xtick.labelsize": 10,
         "ytick.labelsize": 10,
-        "legend.fontsize": 9.0,
+        "legend.fontsize": 9.5,
         "axes.linewidth": 0.8,
         "lines.linewidth": 1.8,
         "savefig.facecolor": "white",
@@ -53,30 +49,20 @@ plt.rcParams.update(
 
 
 def fano_converse(n: int, epsilon: float) -> float:
-    """Return the same coarse Fano/data-processing converse used previously.
-
-    Binary data processing gives
-
-        n D >= (1-beta) log(1/epsilon) - 1,
-
-    after using binary entropy <= 1. Hence
-
-        beta >= [1 - (n D + 1)/log(1/epsilon)]_+.
-
-    At epsilon=1 the constraint is vacuous, so the lower bound is zero.
-    """
+    """Fano/data-processing converse for a direct Type-I budget epsilon."""
+    if not (0.0 <= epsilon <= 1.0):
+        raise ValueError("epsilon must lie in [0,1]")
     if epsilon >= 1.0:
         return 0.0
     if epsilon <= 0.0:
-        raise ValueError("epsilon must be positive")
+        return 1.0
     denominator = math.log(1.0 / epsilon)
-    if denominator <= 0.0:
-        return 0.0
-    return max(0.0, 1.0 - (n * COMPOSITE_KL_QP + 1.0) / denominator)
+    value = 1.0 - (n * COMPOSITE_KL_QP + 1.0) / denominator
+    return max(0.0, min(1.0, value))
 
 
 def load_saved_curves() -> dict[str, list[dict[str, float]]]:
-    """Read the saved numerical results and append the Fano-style converse."""
+    """Read only saved simulation quantities and derive the weak converse."""
     curves: dict[str, list[dict[str, float]]] = {"constant": [], "linear": []}
     with DATA_PATH.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
@@ -86,42 +72,42 @@ def load_saved_curves() -> dict[str, list[dict[str, float]]]:
                 continue
             n = int(row["n"])
             epsilon = float(row["epsilon"])
+            minimax = float(row["minimax"])
+            weak = fano_converse(n, epsilon)
+            if weak > minimax + 5.0e-10:
+                raise RuntimeError(
+                    f"weak converse exceeds saved minimax at n={n}, regime={regime}: "
+                    f"{weak} > {minimax}"
+                )
             curves[regime].append(
                 {
                     "n": n,
                     "epsilon": epsilon,
-                    "minimax": float(row["minimax"]),
+                    "minimax": minimax,
                     "achievability": float(row["achievability"]),
                     "converse": float(row["converse"]),
-                    "fano_converse": fano_converse(n, epsilon),
+                    "weak_converse": weak,
                 }
             )
 
     for regime in curves:
         curves[regime].sort(key=lambda row: row["n"])
-        for row in curves[regime]:
-            if row["fano_converse"] > row["minimax"] + 5.0e-10:
-                raise RuntimeError(
-                    "Fano-style converse exceeds numerical minimax value at "
-                    f"n={int(row['n'])}, regime={regime}"
-                )
     return curves
 
 
-def write_fano_data(curves: dict[str, list[dict[str, float]]]) -> None:
-    """Write the inexpensive third converse result as an auditable CSV."""
+def write_fano_csv(curves: dict[str, list[dict[str, float]]]) -> None:
     FANO_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with FANO_DATA_PATH.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
-            fieldnames=(
+            fieldnames=[
                 "n",
                 "regime",
                 "epsilon",
                 "minimax",
                 "renyi_converse",
                 "fano_converse",
-            ),
+            ],
         )
         writer.writeheader()
         for regime in ("constant", "linear"):
@@ -133,7 +119,7 @@ def write_fano_data(curves: dict[str, list[dict[str, float]]]) -> None:
                         "epsilon": row["epsilon"],
                         "minimax": row["minimax"],
                         "renyi_converse": row["converse"],
-                        "fano_converse": row["fano_converse"],
+                        "fano_converse": row["weak_converse"],
                     }
                 )
 
@@ -148,65 +134,57 @@ def style_axis(ax: plt.Axes) -> None:
     ax.set_ylabel("Type II error")
 
 
-def plot_achievability_panel(
+def plot_panel(
     ax: plt.Axes,
     rows: list[dict[str, float]],
+    bound_key: str,
     title: str,
 ) -> None:
     n = [row["n"] for row in rows]
     minimax = [row["minimax"] for row in rows]
-    achievability = [row["achievability"] for row in rows]
+    bound = [row[bound_key] for row in rows]
 
     ax.plot(n, minimax, color=BLUE, label="minimax Type II error")
-    ax.plot(n, achievability, color=ORANGE, label="achievability bound")
+    if bound_key == "achievability":
+        ax.plot(n, bound, color=ORANGE, label="achievability bound")
+    else:
+        ax.plot(n, bound, color=ORANGE, label="converse bound")
+        weak = [row["weak_converse"] for row in rows]
+        ax.plot(n, weak, color=GREEN, label="weak converse bound")
     style_axis(ax)
     ax.set_title(title, pad=8)
     ax.legend(frameon=False, loc="upper right")
 
 
-def plot_converse_panel(
-    ax: plt.Axes,
-    rows: list[dict[str, float]],
-    title: str,
-) -> None:
-    n = [row["n"] for row in rows]
-    minimax = [row["minimax"] for row in rows]
-    renyi = [row["converse"] for row in rows]
-    fano = [row["fano_converse"] for row in rows]
-
-    ax.plot(n, minimax, color=BLUE, label="minimax Type II error")
-    ax.plot(n, renyi, color=ORANGE, label=r"R\'enyi converse")
-    ax.plot(n, fano, color=GREEN, label="Fano-style converse")
-    style_axis(ax)
-    ax.set_title(title, pad=8)
-    ax.legend(frameon=False, loc="best")
-
-
 def main() -> None:
     curves = load_saved_curves()
-    write_fano_data(curves)
+    write_fano_csv(curves)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(2, 2, figsize=(9.2, 6.9), sharex=True, sharey=False)
 
-    plot_achievability_panel(
+    plot_panel(
         axes[0, 0],
         curves["constant"],
+        "achievability",
         r"Achievability, $\varepsilon = 0.01$",
     )
-    plot_converse_panel(
+    plot_panel(
         axes[0, 1],
         curves["constant"],
+        "converse",
         r"Converse, $\varepsilon = 0.01$",
     )
-    plot_achievability_panel(
+    plot_panel(
         axes[1, 0],
         curves["linear"],
+        "achievability",
         r"Achievability, $\varepsilon = 1/n$",
     )
-    plot_converse_panel(
+    plot_panel(
         axes[1, 1],
         curves["linear"],
+        "converse",
         r"Converse, $\varepsilon = 1/n$",
     )
 
