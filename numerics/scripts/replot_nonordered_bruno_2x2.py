@@ -3,7 +3,7 @@
 
 This script performs no optimisation or hypothesis-testing calculations. It reads
 ``numerics/data/nonordered_bruno_regimes.csv`` and redraws the four saved curves,
-adding the Fano-style weak converse derived directly from the saved Type-I budget.
+adding the Fano-style converse derived directly from the saved Type-I budget.
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def fano_converse(n: int, epsilon: float) -> float:
 
 
 def load_saved_curves() -> dict[str, list[dict[str, float]]]:
-    """Read only saved simulation quantities and derive the weak converse."""
+    """Read only saved simulation quantities and derive the Fano converse."""
     curves: dict[str, list[dict[str, float]]] = {"constant": [], "linear": []}
     with DATA_PATH.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
@@ -76,7 +76,7 @@ def load_saved_curves() -> dict[str, list[dict[str, float]]]:
             weak = fano_converse(n, epsilon)
             if weak > minimax + 5.0e-10:
                 raise RuntimeError(
-                    f"weak converse exceeds saved minimax at n={n}, regime={regime}: "
+                    f"Fano converse exceeds saved minimax at n={n}, regime={regime}: "
                     f"{weak} > {minimax}"
                 )
             curves[regime].append(
@@ -148,9 +148,9 @@ def plot_panel(
     if bound_key == "achievability":
         ax.plot(n, bound, color=ORANGE, label="achievability bound")
     else:
-        ax.plot(n, bound, color=ORANGE, label="converse bound")
+        ax.plot(n, bound, color=ORANGE, label="Rényi converse bound")
         weak = [row["weak_converse"] for row in rows]
-        ax.plot(n, weak, color=GREEN, label="weak converse bound")
+        ax.plot(n, weak, color=GREEN, label="Fano-style converse bound")
     style_axis(ax)
     ax.set_title(title, pad=8)
     ax.legend(frameon=False, loc="upper right")
