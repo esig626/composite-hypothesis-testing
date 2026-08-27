@@ -152,7 +152,7 @@ Every input to the lemma is available. The densities are measurable and finite a
 0<F(y)=z_\lambda\le1
 \]
 
-by the positivity assumption and Holder's inequality. The lemma therefore gives
+by the positivity assumption and Hölder's inequality. The lemma therefore gives
 
 \[
 Q(A_\lambda)=0
@@ -277,7 +277,13 @@ Z_\lambda((t,1-t),(1/2,1/2))
 \bigl[t^\lambda+(1-t)^\lambda\bigr]
 \]
 
-is strictly decreasing for \(t>1/2\). Its maximum on \(\mathcal Q\) is attained at \(t=4/5\). The selected null density has full support, so \(N_\lambda\) is empty. The corrected S1 theorem applies, while the weak compactness version does not.
+has derivative with the sign of
+
+\[
+t^{\lambda-1}-(1-t)^{\lambda-1},
+\]
+
+which is negative for \(t>1/2\) because \(\lambda-1<0\). Its maximum on \(\mathcal Q\) is therefore attained at \(t=4/5\). The selected null density has full support, so \(N_\lambda\) is empty. The corrected S1 theorem applies, while the weak compactness version does not.
 
 ## The joint zero premise cannot simply be deleted
 
