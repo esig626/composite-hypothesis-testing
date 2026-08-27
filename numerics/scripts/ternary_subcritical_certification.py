@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Independent Part A certification driver.
+"""Reproduce and certify the subcritical ternary saddle and n=20 gap table.
 
-This file is intentionally outside the repository.  It imports the repository's
-existing semi-infinite LP implementation and reproduces the subcritical ternary
-saddle and the complete n=20 gap table.
+The driver imports the repository's semi-infinite LP implementation, performs
+continuous cached outer-order optimisation with globally screened selected
+projections, and independently solves the saddle equations at 80 digits.
 
 Example (from the repository root):
 
-    python /workspace/scratch/640a4b58ee10/agent_part_a/part_a_reference.py \
-      --solver numerics/scripts/affine_ternary_lp.py \
-      --full-validation \
-      > /tmp/part_a_receipts.json
+    python numerics/scripts/ternary_subcritical_certification.py
 
-The ``--full-validation`` option adds the 1001-by-1001 global KL/Renyi screens,
-the nested min-max check, and the 100-order Renyi monotonicity diagnostic.  The
-LP, projected-test envelopes, corrected bound, and dense checks always run.
+The default run adds the 1001-by-1001 global KL/Rényi screens, cached continuous
+outer search, nested min-max check, and 100-order Rényi monotonicity diagnostic.
+The LP, projected-test envelopes, corrected bound, and dense checks always run.
 """
 
 from __future__ import annotations
@@ -51,6 +48,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "numerics" / "data"
 DEFAULT_JSON = DATA_DIR / "ternary_subcritical_certification.json"
 DEFAULT_CSV = DATA_DIR / "ternary_subcritical_n20_gap.csv"
+DEFAULT_CACHE = DATA_DIR / "ternary_subcritical_projection_cache.json"
 
 
 def p_at(s: float | np.ndarray) -> np.ndarray:
@@ -328,6 +326,235 @@ def global_projection_receipts(saddle: dict[str, object]) -> dict[str, object]:
             "evaluations": int(result.nfev),
         }
     return {"kl_screen": kl_screen, "renyi_screen": renyi_screen, "global_de": polished}
+
+
+class SubcriticalProjectionCache:
+    """Nearest-order warm starts and receipts for the Q-class || P-class profile."""
+
+    def __init__(self) -> None:
+        self.records: dict[float, dict[str, object]] = {}
+        self.projection_calls = 0
+        self.cache_hits = 0
+        self.global_polishes = 0
+
+    def nearest_starts(self, order: float) -> list[np.ndarray]:
+        records = sorted(
+            self.records.values(),
+            key=lambda record: abs(float(record["order"]) - order),
+        )
+        starts = [
+            np.asarray([float(record["s"]), float(record["t"])])
+            for record in records[:3]
+        ]
+        if not starts:
+            starts = [
+                np.asarray([0.0, 0.0]),
+                np.asarray([0.0, 1.0]),
+                np.asarray([1.0, 0.0]),
+                np.asarray([1.0, 1.0]),
+                np.asarray([0.5, 0.5]),
+            ]
+        return starts
+
+    def project(self, order: float, *, global_screen: bool = False) -> dict[str, object]:
+        if not 0.0 < order < 1.0:
+            raise ValueError("subcritical projections require 0 < order < 1")
+        prior = self.records.get(float(order))
+        if prior is not None and (not global_screen or bool(prior["globally_screened"])):
+            self.cache_hits += 1
+            return prior
+
+        self.projection_calls += 1
+        objective = lambda x: renyi(
+            order, q_at(float(x[1])), p_at(float(x[0]))
+        )
+        starts = self.nearest_starts(order)
+        screen: dict[str, float] | None = None
+        de_evaluations = 0
+        method = "nearest-three-plus-local"
+        if global_screen:
+            self.global_polishes += 1
+            screen = full_square_screen(
+                lambda q, p: np.log(
+                    np.sum(q**order * p ** (1.0 - order), axis=-1)
+                )
+                / (order - 1.0),
+                grid_size=1001,
+            )
+            starts.insert(0, np.asarray([screen["s"], screen["t"]]))
+            global_result = differential_evolution(
+                objective,
+                [(0.0, 1.0), (0.0, 1.0)],
+                tol=1.0e-12,
+                atol=1.0e-14,
+                popsize=30,
+                maxiter=1000,
+                polish=False,
+                seed=1907,
+            )
+            starts.insert(0, np.asarray(global_result.x, dtype=float))
+            de_evaluations = int(global_result.nfev)
+            method = "1001x1001-plus-DE-plus-local"
+
+        best_value = math.inf
+        best_x = np.asarray([math.nan, math.nan])
+        for start in starts:
+            result = minimize(
+                objective,
+                start,
+                method="L-BFGS-B",
+                bounds=[(0.0, 1.0), (0.0, 1.0)],
+                options={
+                    "ftol": 1.0e-15,
+                    "gtol": 1.0e-12,
+                    "maxiter": 1000,
+                    "maxls": 50,
+                },
+            )
+            x = np.clip(result.x, 0.0, 1.0)
+            value = objective(x)
+            if value < best_value:
+                best_value, best_x = float(value), x
+
+        record: dict[str, object] = {
+            "order": float(order),
+            "D": best_value,
+            "s": float(best_x[0]),
+            "t": float(best_x[1]),
+            "method": method,
+            "globally_screened": global_screen,
+            "global_DE_evaluations": de_evaluations,
+        }
+        if screen is not None:
+            record.update(
+                {
+                    "screen_grid_size": int(screen["grid_size"]),
+                    "screen_D": float(screen["value"]),
+                    "screen_s": float(screen["s"]),
+                    "screen_t": float(screen["t"]),
+                    "screen_minus_final": float(screen["value"] - best_value),
+                }
+            )
+        self.records[float(order)] = record
+        return record
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "classes": {
+                "P0": P0.tolist(),
+                "P1": P1.tolist(),
+                "Q0": Q0.tolist(),
+                "Q1": Q1.tolist(),
+            },
+            "orientation": "Qclass||Pclass",
+            "record_count": len(self.records),
+            "projection_calls": self.projection_calls,
+            "cache_hits": self.cache_hits,
+            "global_polishes": self.global_polishes,
+            "records": sorted(self.records.values(), key=lambda record: record["order"]),
+        }
+
+
+def continuous_outer_receipt(
+    saddle: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Continuously maximise the cached max-min profile in two polish rounds."""
+
+    rate = float(saddle["rate"])
+    cache = SubcriticalProjectionCache()
+
+    def objective(order: float) -> float:
+        projection = cache.project(float(order))
+        return (1.0 - order) / order * (float(projection["D"]) - rate)
+
+    screen_orders = np.unique(
+        np.concatenate(
+            (
+                np.linspace(0.02, 0.98, 81),
+                np.asarray([float(saddle["lambda"])]),
+            )
+        )
+    )
+    rounds: list[dict[str, object]] = []
+    for round_index in (1, 2):
+        values = np.asarray([objective(float(order)) for order in screen_orders])
+        screen_index = int(np.argmax(values))
+        left = float(screen_orders[max(0, screen_index - 1)])
+        right = float(screen_orders[min(len(screen_orders) - 1, screen_index + 1)])
+        refined = minimize_scalar(
+            lambda order: -objective(float(order)),
+            bounds=(left, right),
+            method="bounded",
+            options={"xatol": 2.0e-13, "maxiter": 1000},
+        )
+        selected_order = float(refined.x)
+        before_global = cache.project(selected_order)
+        selected_projection = cache.project(selected_order, global_screen=True)
+        selected_value = (1.0 - selected_order) / selected_order * (
+            float(selected_projection["D"]) - rate
+        )
+        adjacent_best = max(objective(left), objective(right))
+        rounds.append(
+            {
+                "round": round_index,
+                "order": selected_order,
+                "value": selected_value,
+                "projection": selected_projection,
+                "global_D_improvement": float(before_global["D"])
+                - float(selected_projection["D"]),
+                "screen_bracket": [left, right],
+                "adjacent_screen_inferiority": max(0.0, adjacent_best - selected_value),
+            }
+        )
+
+    order_change = abs(float(rounds[-1]["order"]) - float(rounds[-2]["order"]))
+    divergence_change = abs(
+        float(rounds[-1]["projection"]["D"])
+        - float(rounds[-2]["projection"]["D"])
+    )
+    value_change = abs(float(rounds[-1]["value"]) - float(rounds[-2]["value"]))
+    largest_global_improvement = max(
+        abs(float(receipt["global_D_improvement"])) for receipt in rounds
+    )
+    if order_change > 5.0e-8 or largest_global_improvement > 1.0e-10:
+        raise RuntimeError(
+            "subcritical continuous outer optimisation did not stabilise: "
+            f"order change={order_change:.3e}, global D improvement="
+            f"{largest_global_improvement:.3e}, "
+            f"rounds={rounds}"
+        )
+    if any(float(receipt["adjacent_screen_inferiority"]) > 1.0e-10 for receipt in rounds):
+        raise RuntimeError("subcritical optimum is inferior to an adjacent screen point")
+    if abs(float(rounds[-1]["value"]) - float(saddle["exponent"])) > 2.0e-11:
+        raise RuntimeError("cached outer optimisation and stationarity solve disagree")
+
+    receipt = {
+        "formulation": (
+            "max_{0<lambda<1} (1-lambda)/lambda "
+            "[min_{s,t} D_lambda(Q_t||P_s)-r_minus]"
+        ),
+        "screen_order_count": int(len(screen_orders)),
+        "screen_interval": [0.02, 0.98],
+        "outer_rounds": rounds,
+        "outer_xatol": 2.0e-13,
+        "outer_order_stability_tolerance": 5.0e-8,
+        "inner_D_stability_tolerance": 1.0e-10,
+        "adjacent_point_tolerance": 1.0e-10,
+        "order_change": order_change,
+        "divergence_change": divergence_change,
+        "value_change": value_change,
+        "largest_global_D_improvement": largest_global_improvement,
+        "order_one_limit": {
+            "D": float(saddle["kl_divergence"]),
+            "objective": 0.0,
+        },
+        "order_zero_limit": "minus infinity because all coordinates have full support and r_minus>0",
+        "new_order_count": len(cache.records),
+        "projection_calls": cache.projection_calls,
+        "cache_hits": cache.cache_hits,
+        "global_polishes": cache.global_polishes,
+    }
+    return receipt, cache.payload()
 
 
 def equivalent_minmax_receipt(saddle: dict[str, object]) -> dict[str, object]:
@@ -618,6 +845,7 @@ def main() -> None:
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_JSON)
     parser.add_argument("--gap-csv", type=Path, default=DEFAULT_CSV)
+    parser.add_argument("--projection-cache", type=Path, default=DEFAULT_CACHE)
     args = parser.parse_args()
 
     solver = load_affine_solver(args.solver)
@@ -634,9 +862,16 @@ def main() -> None:
         "n20": finite_block_receipts(solver, saddle),
     }
     if not args.skip_full_validation:
+        outer_receipt, projection_cache = continuous_outer_receipt(saddle)
+        output["continuous_outer_optimisation"] = outer_receipt
         output["global_projection_validation"] = global_projection_receipts(saddle)
         output["equivalent_minmax"] = equivalent_minmax_receipt(saddle)
         output["renyi_monotonicity"] = renyi_monotonicity_receipt()
+        args.projection_cache.parent.mkdir(parents=True, exist_ok=True)
+        args.projection_cache.write_text(
+            json.dumps(projection_cache, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -713,6 +948,8 @@ def main() -> None:
         writer.writerows(rows)
     print(f"wrote {args.output}")
     print(f"wrote {args.gap_csv}")
+    if not args.skip_full_validation:
+        print(f"wrote {args.projection_cache}")
 
 
 if __name__ == "__main__":

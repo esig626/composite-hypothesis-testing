@@ -21,6 +21,83 @@
       0.416
     ]
   },
+  "continuous_outer_optimisation": {
+    "adjacent_point_tolerance": 1e-10,
+    "cache_hits": 95,
+    "divergence_change": 1.7199329530037666e-09,
+    "formulation": "max_{0<lambda<1} (1-lambda)/lambda [min_{s,t} D_lambda(Q_t||P_s)-r_minus]",
+    "global_polishes": 2,
+    "inner_D_stability_tolerance": 1e-10,
+    "largest_global_D_improvement": 5.759281940243e-16,
+    "new_order_count": 97,
+    "order_change": 1.784165348794886e-08,
+    "order_one_limit": {
+      "D": 0.09487789505284774,
+      "objective": 0.0
+    },
+    "order_zero_limit": "minus infinity because all coordinates have full support and r_minus>0",
+    "outer_order_stability_tolerance": 5e-08,
+    "outer_rounds": [
+      {
+        "adjacent_screen_inferiority": 0.0,
+        "global_D_improvement": 5.759281940243e-16,
+        "order": 0.6014375128904821,
+        "projection": {
+          "D": 0.05631531385857096,
+          "global_DE_evaluations": 4980,
+          "globally_screened": true,
+          "method": "1001x1001-plus-DE-plus-local",
+          "order": 0.6014375128904821,
+          "s": 2.1094237345046257e-15,
+          "screen_D": 0.056315316293160965,
+          "screen_grid_size": 1001,
+          "screen_minus_final": 2.43459000182078e-09,
+          "screen_s": 0.0,
+          "screen_t": 0.603,
+          "t": 0.6028434051596725
+        },
+        "round": 1,
+        "screen_bracket": [
+          0.5960000000000001,
+          0.608
+        ],
+        "value": 0.015313315046096303
+      },
+      {
+        "adjacent_screen_inferiority": 0.0,
+        "global_D_improvement": 0.0,
+        "order": 0.6014375307321356,
+        "projection": {
+          "D": 0.056315315578503916,
+          "global_DE_evaluations": 4980,
+          "globally_screened": true,
+          "method": "1001x1001-plus-DE-plus-local",
+          "order": 0.6014375307321356,
+          "s": 2.0888699255888614e-15,
+          "screen_D": 0.0563153180130473,
+          "screen_grid_size": 1001,
+          "screen_minus_final": 2.4345433863315336e-09,
+          "screen_s": 0.0,
+          "screen_t": 0.603,
+          "t": 0.6028434048824637
+        },
+        "round": 2,
+        "screen_bracket": [
+          0.5960000000000001,
+          0.608
+        ],
+        "value": 0.015313315046096359
+      }
+    ],
+    "outer_xatol": 2e-13,
+    "projection_calls": 99,
+    "screen_interval": [
+      0.02,
+      0.98
+    ],
+    "screen_order_count": 82,
+    "value_change": 5.551115123125783e-17
+  },
   "equivalent_minmax": {
     "difference_from_max_min": -1.6653345369377348e-16,
     "global_evaluations": 3150,
