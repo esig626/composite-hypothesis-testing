@@ -76,7 +76,7 @@ z_\lambda^\star=e^{(\lambda-1)D_\lambda(Q_\lambda^\star\|P_\lambda^\star)}.
 
 1. **Ordinary convexity** is used only to make the segments ((1-t)q^\star+tq) and ((1-t)p^\star+tp) feasible. Joint optimality makes (Z_\lambda) nonincreasing from (t=0) along each segment, exactly the premise of the derivative lemma. No α-convexity is used.
 2. **Weak compactness** is used only for attainment. Norm continuity of (Z_\lambda), concavity, and norm-closed convex superlevel sets imply weak upper semicontinuity. It is not used after selecting a maximiser.
-3. **Domination by (P^\star+Q^\star)** is used only to make every class law null on (N). The derivative lemma already handles (A) and (B). The proof therefore needs only (R(N)=0) for every class member.
+3. **Domination by (P^\star+Q^\star)** is used only to make every class law null on (N). The derivative lemma already handles (A) and (B). The proof therefore uses only (R(N)=0) for every class member. Within the present common domination framework, however, this condition is equivalent to domination by the selected sum and is not a weaker support premise.
 4. **Positivity of (z_\lambda^\star)** is needed for the derivative lemma's hypothesis (0<F(y)<\infty) in both coordinates. Finiteness is automatic ((Z_\lambda\le1)). Positivity also makes the selected divergence finite and the negative-power certificates meaningful.
 
 ### Geometry versus supports versus testing
@@ -115,24 +115,35 @@ No inspected candidate established a genuine two-class Rényi nearest-pair Pytha
 
 ## 4. Proposed results in the manuscript's notation
 
-### Candidate S1 — attainment and minimal support
+### Candidate S1 — direct attainment
 
-**Type:** Theorem.
+**Status:** **PROVED WITH QUALIFICATION (2026-08-27).** The proof audit is in theory/audits/renyi_projection/s1_direct_attainment_proof.md.
 
-**Proposed statement.** Fix (0<\lambda<1). Let (\mathscr P,\mathscr Q\subset\mathsf D_\mu) be nonempty and convex. Assume directly that a joint maximiser ((q_\lambda^\star,p_\lambda^\star)) exists, (z_\lambda^\star>0), and
+**Type:** Theorem modularisation.
+
+**Corrected statement.** Fix \(0<\lambda<1\). Let the two dominated density classes be nonempty and convex. Assume directly that a positive joint maximiser \((q_\lambda^\star,p_\lambda^\star)\) exists and that
 \[
-R\{p_\lambda^\star=q_\lambda^\star=0\}=0\qquad
+R\{p_\lambda^\star=q_\lambda^\star=0\}=0
+\qquad
 \forall R\in\mathcal P\cup\mathcal Q.
 \]
-Then the extended (h_\lambda^\star) satisfies both support conclusions and both uniform moment inequalities of the current theorem, and the pair attains (D_\lambda(\mathcal Q\|\mathcal P)).
+Then the extended log likelihood ratio of the selected pair satisfies both support conclusions and both uniform moment inequalities of the current theorem. The pair also attains \(D_\lambda(\mathcal Q\|\mathcal P)\).
 
-**Relation:** Replaces weak compactness by direct attainment and selected-pair domination by its strictly weaker, proof-exact consequence.
+**Relation:** Direct attainment genuinely weakens the existence premise because it allows noncompact classes whenever the maximum happens to be attained. The displayed joint zero condition does not weaken the support premise. In the present common domination framework, it is equivalent to
+\[
+R\ll P_\lambda^\star+Q_\lambda^\star
+\qquad
+\forall R\in\mathcal P\cup\mathcal Q.
+\]
+It is therefore a proof exact reformulation of selected sum domination, not a strictly weaker or minimal condition.
 
-**Additional assumptions:** None beyond the statement; no common support.
+**Proof route:** Apply the existing complete feasible one sided derivative lemma separately along the two coordinate segments. This gives the two cross support null statements and the two integrals over the common positive cell. The exact moment decompositions contain the additional terms \(P(N_\lambda)\) and \(Q(N_\lambda)\), which vanish under the selected sum support premise.
 
-**Proof route:** Start after attainment in the current proof. Convexity gives both segments; the existing derivative lemma supplies cross-support nullity and the integrals. The displayed condition handles (N). No external theorem is needed.
+**Boundary check:** The support premise cannot simply be deleted. A three point finite alphabet example in the proof audit has a positive attained maximiser but a class law supported on the joint zero cell. With the current convention that the extended ratio is zero there, the null moment equals one and exceeds the selected Hellinger value.
 
-**Confidence:** **HIGH**. **Value:** strongest immediate measurable-space improvement and a cleaner separation of existence, geometry, and support.
+**Manuscript decision:** No manuscript change has been made. If later approved, the accurate claim is only that direct attainment can replace weak compactness. The support premise must not be advertised as weakened.
+
+**Confidence:** **PROVED**, subject to the preceding correction. **Value:** useful theorem modularisation and a genuine extension to some noncompact classes, but no new support theorem.
 
 ### Candidate S2 — modular existence criteria
 
@@ -284,7 +295,7 @@ Five is best except for “machinery”, where five means most new machinery.
 
 | Rank | Candidate | Strength | Feasibility | Use | Correctness | Machinery |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | S1 minimal support/direct attainment | 5 | 5 | 5 | 5 | 1 |
+| 1 | S1 direct attainment | 4 | 5 | 5 | 5 | 1 |
 | 2 | S6 continuity/stability | 4 | 5 | 5 | 5 | 2 |
 | 3 | S4 simultaneous VI | 4 | 4 | 4 | 5 | 2 |
 | 4 | S7 envelope derivative | 4 | 4 | 4 | 5 | 3 |
@@ -294,14 +305,14 @@ Five is best except for “machinery”, where five means most new machinery.
 | 8 | S8 α-convex Pythagorean | 5 | 3 | 3 | 3 | 4 |
 | 9 | S9 endpoints/(\lambda>1) | 5 | 2 | 5 | 2 | 5 |
 
-### Top-three concrete next proof tasks
+### Proof status and next tasks
 
-1. **S1:** Rewrite the proof with “a positive maximiser exists” as the only existence premise and (R\{p^\star=q^\star=0\}=0) as the support premise; check all four support cells.
+1. **S1 is complete:** direct attainment is sufficient, while the proposed joint zero support condition is equivalent to the existing selected sum domination condition.
 2. **S6:** Prove joint continuity on (I\times\mathcal Q\times\mathcal P), then give a self-contained sequential proof of upper hemicontinuity and unique-selector continuity.
-3. **S4:** Integrate the pointwise tangent inequality and verify derivative integrability; then investigate a boundary supergradient version without common support.
+3. **S4:** Integrate the pointwise tangent inequality and verify derivative integrability, then investigate a boundary supergradient version without common support.
 
 ## 7. Short conclusion
 
-* **Strongest immediately provable upgrade:** S1, because the existing proof uses weak compactness only for attainment and domination only on the joint-zero set.
+* **Strongest confirmed immediate upgrade:** S1 permits direct attainment in place of weak compactness. Its support formulation is equivalent to the existing selected sum domination premise, so no support weakening is claimed.
 * **Most interesting deeper upgrade:** S8/S9, a correctly oriented α-convex Pythagorean extension or endpoint/two-class dual theory; both need materially new machinery.
 * **Most promising new corollary:** S6, continuity of the value and, under uniqueness, the projected pair on compact uniformly full-support finite-alphabet classes; S7 is its natural sequel.
