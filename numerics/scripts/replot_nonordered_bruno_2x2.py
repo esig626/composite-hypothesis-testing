@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Replot the non-ordered Bruno 2x2 figure from the saved CSV only.
+"""Replot the non-ordered Bruno 2x2 figure from saved CSV files only.
 
 This script performs no optimisation or hypothesis-testing calculations. It reads
-``numerics/data/nonordered_bruno_regimes.csv`` and redraws the four saved curves,
-adding the Fano-style converse derived directly from the saved Type-I budget.
+the authoritative LP/achievability rows from ``nonordered_bruno_regimes.csv``,
+overlays the validated continuous Rényi converse from the imported comparison
+CSV, and retains the Fano-style converse derived from the saved Type-I budget.
 """
 
 from __future__ import annotations
@@ -20,6 +21,12 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "numerics" / "data" / "nonordered_bruno_regimes.csv"
+CONTINUOUS_DATA_PATH = (
+    ROOT
+    / "numerics"
+    / "data"
+    / "nonordered_bruno_continuous_converse_comparison.csv"
+)
 FANO_DATA_PATH = ROOT / "numerics" / "data" / "nonordered_bruno_fano_converse.csv"
 FIGURE_DIR = ROOT / "numerics" / "figures"
 
@@ -62,8 +69,40 @@ def fano_converse(n: int, epsilon: float) -> float:
 
 
 def load_saved_curves() -> dict[str, list[dict[str, float]]]:
-    """Read only saved simulation quantities and derive the Fano converse."""
+    """Join saved legacy rows to the validated continuous converse by key."""
+
+    continuous: dict[tuple[int, str], dict[str, float]] = {}
+    with CONTINUOUS_DATA_PATH.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            regime = row["regime"]
+            if regime not in {"constant", "linear"}:
+                raise RuntimeError(f"unexpected continuous regime {regime!r}")
+            key = (int(row["n"]), regime)
+            if key in continuous:
+                raise RuntimeError(f"duplicate continuous-converse key {key}")
+            continuous[key] = {
+                "epsilon": float(row["epsilon"]),
+                "minimax": float(row["minimax"]),
+                "legacy_converse": float(row["legacy_converse"]),
+                "continuous_converse": float(row["continuous_converse"]),
+            }
+
+    expected_keys = {
+        (n, regime)
+        for n in range(1, 301)
+        for regime in ("constant", "linear")
+    }
+    if set(continuous) != expected_keys:
+        missing = sorted(expected_keys - set(continuous))[:5]
+        extra = sorted(set(continuous) - expected_keys)[:5]
+        raise RuntimeError(
+            "continuous comparison must contain exactly 600 keyed rows; "
+            f"missing={missing}, extra={extra}"
+        )
+
     curves: dict[str, list[dict[str, float]]] = {"constant": [], "linear": []}
+    seen: set[tuple[int, str]] = set()
     with DATA_PATH.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -73,6 +112,20 @@ def load_saved_curves() -> dict[str, list[dict[str, float]]]:
             n = int(row["n"])
             epsilon = float(row["epsilon"])
             minimax = float(row["minimax"])
+            key = (n, regime)
+            if key in seen:
+                raise RuntimeError(f"duplicate legacy key {key}")
+            seen.add(key)
+            imported = continuous[key]
+            if epsilon != imported["epsilon"] or minimax != imported["minimax"]:
+                raise RuntimeError(
+                    f"continuous comparison does not match saved row {key}"
+                )
+            legacy_converse = float(row["converse"])
+            if legacy_converse != imported["legacy_converse"]:
+                raise RuntimeError(
+                    f"continuous comparison does not reproduce legacy converse {key}"
+                )
             weak = fano_converse(n, epsilon)
             if weak > minimax + 5.0e-10:
                 raise RuntimeError(
@@ -85,11 +138,18 @@ def load_saved_curves() -> dict[str, list[dict[str, float]]]:
                     "epsilon": epsilon,
                     "minimax": minimax,
                     "achievability": float(row["achievability"]),
-                    "converse": float(row["converse"]),
+                    "converse": imported["continuous_converse"],
                     "weak_converse": weak,
                 }
             )
 
+    if seen != expected_keys:
+        missing = sorted(expected_keys - seen)[:5]
+        extra = sorted(seen - expected_keys)[:5]
+        raise RuntimeError(
+            f"legacy data do not supply the same 600 keys; missing={missing}, "
+            f"extra={extra}"
+        )
     for regime in curves:
         curves[regime].sort(key=lambda row: row["n"])
     return curves
