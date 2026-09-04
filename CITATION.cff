@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "Please cite the paper below if you use this repository."
+title: "Finite Sample Bounds for Composite Hypothesis Testing"
+type: software
+authors:
+  - family-names: "Vera-Sigüenza"
+    given-names: "Elías"
+  - family-names: "Esposito"
+    given-names: "Amedeo Roberto"
+repository-code: "https://github.com/esig626/composite-hypothesis-testing"
+url: "https://arxiv.org/abs/2608.28068"
+preferred-citation:
+  type: article
+  title: "Finite Sample Bounds for Composite Hypothesis Testing"
+  authors:
+    - family-names: "Vera-Sigüenza"
+      given-names: "Elías"
+    - family-names: "Esposito"
+      given-names: "Amedeo Roberto"
+  year: 2026
+  identifiers:
+    - type: doi
+      value: "10.48550/arXiv.2608.28068"
+  url: "https://arxiv.org/abs/2608.28068"

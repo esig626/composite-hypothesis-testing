@@ -1,0 +1,28 @@
+# LaTeX build artefacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.dvi
+*.ps
+*-converted-to.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors and operating systems
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
