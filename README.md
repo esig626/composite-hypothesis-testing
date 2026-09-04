@@ -30,7 +30,7 @@ The README previews `Figure_1.eps` and `Figure_2.eps` from the paper source. Tog
 
 ## Repository layout
 
-- [`paper/`](paper/) — arXiv v2 LaTeX source, bibliography, all five EPS figures, and the published PDF.
+- [`paper/`](paper/) — arXiv v2 LaTeX source, bibliography, all five EPS figures, and the arXiv PDF.
 - [`numerics/`](numerics/) — numerical scripts, saved data, figures, and validation artefacts from the research workflow.
 - [`assets/`](assets/) — PNG previews used in this README.
 
@@ -43,7 +43,7 @@ cd paper
 latexmk -pdf -shell-escape manuscript.tex
 ```
 
-The published version is available directly as [`paper/Manuscript.pdf`](paper/Manuscript.pdf).
+The current arXiv version is available directly as [`paper/Manuscript.pdf`](paper/Manuscript.pdf).
 
 ## Citation
 
