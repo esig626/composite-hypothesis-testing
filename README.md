@@ -13,9 +13,7 @@ The paper studies finite-sample binary hypothesis testing when both the null and
 - A single uniformly valid test built from a joint Rényi projection for orders $0<\lambda<1$.
 - A phase transition at
 
-  $$
-  r_{\mathrm c}=\inf_{Q\in\mathcal C_1}\inf_{P\in\mathcal C_0}D(Q\|P).
-  $$
+  $$r_{\mathrm c}=\inf_{Q\in\mathcal C_1}\inf_{P\in\mathcal C_0}D(Q\|P).$$
 
 - Exact achievable and strong-converse exponents on finite alphabets, together with a polynomial refinement and conditions for finite-sample least favourability.
 
