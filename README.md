@@ -10,16 +10,18 @@ The paper studies finite-sample binary hypothesis testing when both the null and
 ## Main results
 
 - A finite-sample Rényi converse obtained by pairwise reduction, without assuming a least-favourable pair.
-- A single uniformly valid test built from a joint Rényi projection for orders \(0<\lambda<1\).
+- A single uniformly valid test built from a joint Rényi projection for orders $0<\lambda<1$.
 - A phase transition at
-  \[
+
+  $$
   r_{\mathrm c}=\inf_{Q\in\mathcal C_1}\inf_{P\in\mathcal C_0}D(Q\|P).
-  \]
+  $$
+
 - Exact achievable and strong-converse exponents on finite alphabets, together with a polynomial refinement and conditions for finite-sample least favourability.
 
 ## Finite-sample illustration
 
-The two panels below form Figure 1 of the paper for nonordered affine ternary classes under \(\varepsilon=e^{-nr}\). The left panel is below the transition at \(r=0.35D(\mathcal C_1\|\mathcal C_0)\); the right panel is above it at \(r=1.5D(\mathcal C_1\|\mathcal C_0)\).
+The README previews `Figure_1.eps` and `Figure_2.eps` from the paper source. Together they form the paper's first figure for nonordered affine ternary classes under $\varepsilon=e^{-nr}$: the left panel is below the transition at $r=0.35D(\mathcal C_1\|\mathcal C_0)$, while the right panel is above it at $r=1.5D(\mathcal C_1\|\mathcal C_0)$.
 
 <p align="center">
   <img src="assets/figure_1.png" alt="Achievable regime: optimal Type II error and Rényi achievability bound" width="48%">
@@ -28,9 +30,9 @@ The two panels below form Figure 1 of the paper for nonordered affine ternary cl
 
 ## Repository layout
 
-- [`paper/`](paper/) — arXiv v2 manuscript source, bibliography, all five EPS figures, and the compiled PDF.
+- [`paper/`](paper/) — arXiv v2 LaTeX source, bibliography, all five EPS figures, and the published PDF.
+- [`numerics/`](numerics/) — numerical scripts, saved data, figures, and validation artefacts from the research workflow.
 - [`assets/`](assets/) — PNG previews used in this README.
-- [`numerics/`](numerics/) — numerical scripts, saved data, figures, and validation artefacts retained from the research workflow.
 
 ## Build the manuscript
 
@@ -41,7 +43,7 @@ cd paper
 latexmk -pdf -shell-escape manuscript.tex
 ```
 
-The published PDF is also available directly at [`paper/Manuscript.pdf`](paper/Manuscript.pdf).
+The published version is available directly as [`paper/Manuscript.pdf`](paper/Manuscript.pdf).
 
 ## Citation
 
@@ -56,6 +58,8 @@ The published PDF is also available directly at [`paper/Manuscript.pdf`](paper/M
   doi           = {10.48550/arXiv.2608.28068}
 }
 ```
+
+Citation metadata are also provided in [`CITATION.cff`](CITATION.cff).
 
 ## License
 
