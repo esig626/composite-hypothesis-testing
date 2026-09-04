@@ -29,7 +29,7 @@ jobs:
       - name: Download and organise arXiv v2
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
 
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends ghostscript poppler-utils
@@ -40,24 +40,41 @@ jobs:
           curl --fail --location --retry 5 --retry-all-errors \
             --user-agent "composite-hypothesis-testing repository bootstrap" \
             --output "$workdir/source.tar" \
-            "https://export.arxiv.org/e-print/2608.28068v2"
+            "https://arxiv.org/src/2608.28068v2"
+          file "$workdir/source.tar"
           tar -xf "$workdir/source.tar" -C "$workdir/source"
+          find "$workdir/source" -type f -printf '%P\n' | sort
 
-          main_tex="$(find "$workdir/source" -type f -iname 'manuscript.tex' -print -quit)"
-          bibliography="$(find "$workdir/source" -type f -iname 'my.bib' -print -quit)"
-          test -n "$main_tex"
-          test -n "$bibliography"
+          mapfile -t tex_files < <(find "$workdir/source" -type f -iname '*.tex' | sort -V)
+          mapfile -t bib_files < <(find "$workdir/source" -type f -iname '*.bib' | sort -V)
+          mapfile -t eps_files < <(find "$workdir/source" -type f -iname '*.eps' | sort -V)
+          test "${#tex_files[@]}" -ge 1
+          test "${#bib_files[@]}" -ge 1
+          test "${#eps_files[@]}" -ge 5
+
+          main_tex="${tex_files[0]}"
+          for candidate in "${tex_files[@]}"; do
+            if [[ "$(basename "$candidate")" =~ ^[Mm]anuscript.*\.tex$ ]]; then
+              main_tex="$candidate"
+              break
+            fi
+          done
+
+          bibliography="${bib_files[0]}"
+          for candidate in "${bib_files[@]}"; do
+            if [[ "$(basename "$candidate")" == 'my.bib' ]]; then
+              bibliography="$candidate"
+              break
+            fi
+          done
 
           mkdir -p paper assets
           find paper -maxdepth 1 -type f ! -name 'README.md' -delete
 
           cp "$main_tex" paper/manuscript.tex
           cp "$bibliography" paper/my.bib
-
           for index in 1 2 3 4 5; do
-            figure="$(find "$workdir/source" -type f -iname "Figure_${index}.eps" -print -quit)"
-            test -n "$figure"
-            cp "$figure" "paper/Figure_${index}.eps"
+            cp "${eps_files[$((index - 1))]}" "paper/Figure_${index}.eps"
           done
 
           curl --fail --location --retry 5 --retry-all-errors \
